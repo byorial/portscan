@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+{% block content %}
+
+{{ macros.m_row_start('0') }}
+{{ macros.m_row_end() }}
+
+<div>
+  <form id="form_search" name="from_search" class="form-inline" style="text-align:left">
+    <div class="container-fluid">
+      <div class="row show-grid">
+        <span class="col-md-12">
+          {{ macros.m_button_group([['register_job_btn', '작업그룹등록']]) }}
+	      <input id="keyword" name="keyword" class="form-control form-control-sm w-75" type="text" placeholder="제목입력" aria-label="Search">
+          {{ macros.m_button_group([['search', '검색'], ['globalSearchResetBtn', '리셋']]) }}
+        </span>
+       </div>
+    </div>
+  </form>
+  <div id='page1'></div>
+  {{ macros.m_hr_head_top() }}
+  {{ macros.m_row_start('0') }}
+  {{ macros.m_col(2, macros.m_strong('ID/등록시각')) }}
+  {{ macros.m_col(8, macros.m_strong('제목/설명')) }}
+  {{ macros.m_col(2, macros.m_strong('기능')) }}
+  {{ macros.m_row_end() }}
+  {{ macros.m_hr_head_bottom() }}
+  <div id="list_div"></div>
+  <div id='page2'></div>
+</div>
+
+<!-- Modal:등록 -->
+<div class="modal fade" id="jobgroup_modal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 class="modal-title" id="modal_title">스캔작업 그룹 등록</h4>
+      </div>
+      <div class="modal-body" id="modal_body" style="word-break:break-all;">
+	<form id="scanjob_register_form" name="scanjob_register_form">
+      {{ macros.setting_input_text('name', '작업그룹명') }}
+      {{ macros.setting_input_text('desc', '작업설명') }}
+	</form>
+      </div>
+      <div class="modal-footer" style="align-items:right;">
+         {{ macros.m_button_group([['jobgroup_save_btn', '저장'], ['modal_hide_btn', '닫기']])}}
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Modal: 등록 END -->
+
+<!-- Modal: 수정 -->
+<div class="modal fade" id="jobgroup_modify_modal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h4 class="modal-title" id="modal_title">스캔작업 그룹 수정</h4>
+      </div>
+      <div class="modal-body" id="modal_body" style="word-break:break-all;">
+	<form id="scanjob_modify_form" name="scanjob_modify_form">
+      <input type='hidden' id="jobid" name="jobid">
+      {{ macros.setting_input_text('m_name', '작업그룹명') }}
+      {{ macros.setting_input_text('m_desc', '작업설명') }}
+	</form>
+      </div>
+      <div class="modal-footer" style="align-items:right;">
+      <div class="modal-footer" style="align-items:right;">
+         {{ macros.m_button_group([['jobgroup_modify_btn', '저장'], ['jobgroup_remove_btn', '삭제'], ['m_modal_hide_btn', '닫기']])}}
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Modal: 수정END -->
+
+
+<script type="text/javascript">
+var package_name = "{{arg['package_name'] }}";
+var sub = "{{arg['sub']}}";
+var current_data = null;
+var formData = null;
+
+$(document).ready(function(){
+  request_search('1');
+});
+
+function make_list(data) {
+  var str = "";
+  if (data.length == 0)
+    str += '<tr><td colspan="6"><h4>데이터가 없습니다</h4></td></tr>';
+  current_data = data;
+  for (i in data) {
+    str += j_row_start();
+    tmp = data[i].id + '<br>';
+    tmp += data[i].created_time;
+    str += j_col(2, tmp)
+
+    tmp = '<strong>제목: '+data[i].name+'</strong><br>';
+    tmp += '설명: '+data[i].desc+'<br>';
+    str += j_col(8, tmp);
+
+    btn_str = j_button_tt('modify_job_btn', '수정', [{'key':'idx', 'value':i }], 'success', tooltip='스캔작업을 수정합니다.', pos='up-left');
+    tmp = j_button_group(btn_str)
+    str += j_col(2, tmp);
+    str += j_row_end();
+    if (i != data.length -1) str += j_hr();
+  }
+  $("#list_div").html(str);
+}
+
+$("body").on('click', '#register_job_btn', function(e) {
+  e.preventDefault();
+  $("#jobgroup_modal").modal();
+});
+
+$("body").on('click', '#modify_job_btn', function(e) {
+  e.preventDefault();
+  idx = $(this).data('idx');
+  job = current_data[idx];
+  document.getElementById('jobid').value = job.id;
+  document.getElementById('m_name').value = job.name;
+  document.getElementById('m_desc').value = job.desc;
+  $("#jobgroup_modify_modal").modal();
+});
+
+$('#jobgroup_modal').on('hidden.bs.modal', function () {
+})
+$('#jobgroup_modify_modal').on('hidden.bs.modal', function () {
+})
+
+function j_button_tt(id, text, data, outline_color, tooltip='', pos='down', size='medium') {
+  var str = '<button id="'+id+'" name="'+id+'" class="btn btn-sm btn-outline-'+outline_color+'" '
+  if (tooltip == '') str += ' aria-label="' +text+'"';
+  else str += ' aria-label="' +tooltip+'"';
+  str += ' data-balloon-pos="' +pos+ '" data-balloon-length="'+size+'"';
+  for ( var i in data) {
+    str += ' data-' + data[i].key + '="' + data[i].value+ '" '
+  }
+  str += '>' + text + '</button>';
+  return str;
+}
+
+$("body").on('click', '#modal_hide_btn', function(e){
+  e.preventDefault();
+  $('#jobgroup_modal').modal('hide');
+});
+
+$("body").on('click', '#m_modal_hide_btn', function(e){
+  e.preventDefault();
+  $('#jobgroup_modify_modal').modal('hide');
+});
+
+
+$("body").on('click', '#jobgroup_save_btn', function(e){
+  e.preventDefault();
+  var formData = getFormdata('#scanjob_register_form');
+  globalSendCommandPage('jobgroup_save', formData, null, null, function(ret){
+    if (ret.ret == 'success') {
+      $('#jobgroup_modal').modal('hide');
+      request_search('1');
+    }
+    else {
+      notify(ret.data, 'warning');
+    }
+  });
+});
+
+
+$("body").on('click', '#jobgroup_modify_btn', function(e){
+  e.preventDefault();
+  //tmp = document.getElementById("schedule_radio2").getAttribute("checked");
+  schedule_mode = $('input[name=m_schedule_mode]:checked').val();
+  schedule_interval = $("#m_schedule_interval").val();
+  
+  if (schedule_mode == 'scheduler' && schedule_interval == '') {
+    notify("스케쥴링 정보를 입력하세요", 'warning');
+    return
+  }
+
+  var formData = getFormdata('#scanjob_modify_form');
+  globalSendCommandPage('jobgroup_modify', formData, null, null, function(ret){
+    if (ret.ret == 'success') {
+      $('#jobgroup_modify_modal').modal('hide');
+      request_search('1');
+    }
+    else {
+      notify(ret.data, 'warning');
+    }
+  });
+});
+
+
+function request_search(my, page, move_top=false) {
+  var formData = getFormdata('#form_search');
+  globalSendCommandPage('web_list', formData, null, null, function(data) {
+    if (data.ret == 'success') {
+      if (move_top) window.scrollTo(0,0);
+      make_list(data.list)
+      make_page_html(data.paging)
+    }
+  });
+}
+</script>    
+{% endblock %}

@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block content %}
+
+{{ macros.m_row_start('0') }}
+{{ macros.m_row_end() }}
+<!--
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.13.1/css/bootstrap-select.css" />
+<script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.1.1/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.13.1/js/bootstrap-select.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.11.0/umd/popper.min.js" integrity="sha384-b/U6ypiBEHpOf/4+1nzFpr53nxSS+GLCkfwBdFNTxtclqqenISfwAzpKaMNFNmj4" crossorigin="anonymous"></script>
+//-->
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/bbbootstrap/libraries@main/choices.min.css">
+<script src="https://cdn.jsdelivr.net/gh/bbbootstrap/libraries@main/choices.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+
+<!-- basic report -->
+<div>
+  <form id="report_form" name="report_form" class="form-inline" style="text-align;left">
+    <div class="container-fluid">
+      <div class="row show-grid">
+          <span class="col-md-8">
+          <select name="jobgroup_options" id="jobgroup_options" class="form-control form-control-sm">
+          </select>
+          <select name="port_options" id="port_options" class="form-control form-control-sm">
+            <option value="all">전체호스트</option>
+            <option value="open">열린포트</option>
+          </select>
+          <!--<select name="scan_options" id="scan_options" class="selectpicker" multiple> -->
+          <select name="scan_options" id="scan_options" class="form-control form-control-sm" multiple placeholder="보고서에포함할스캔작업선택">
+          </select>
+          </span>
+          <span class="col-md-4">
+          {{ macros.m_button("basic_report_btn", "보고서받기") }}
+          </span>
+          {{ macros.m_hr() }}
+      </div>
+    </div>
+  <form>
+</div>
+
+<script type="text/javascript">
+var package_name = "{{arg['package_name'] }}";
+var sub = "{{arg['sub']}}";
+var current_data = null;
+var formData = null;
+
+var str_jobgroup_ids = "{{arg['jobgroup_ids']}}";
+var str_jobgroup_names = "{{arg['jobgroup_names']}}";
+var jobgroup_ids = str_jobgroup_ids.split('|');
+var jobgroup_names = str_jobgroup_names.split('|');
+
+var str_scan_ids = "{{arg['scan_ids']}}";
+var str_scan_names = "{{arg['scan_names']}}";
+var scan_ids = str_scan_ids.split('|');
+var scan_names = str_scan_names.split('|');
+
+$(document).ready(function(){
+  console.log(jobgroup_ids);
+  console.log(jobgroup_names);
+  console.log(scan_ids);
+  console.log(scan_names);
+  set_jobgroup_options();
+  set_scan_options();
+});
+
+function set_jobgroup_options(job_group_id = '') {
+  for (i = 0; i < jobgroup_ids.length; i++) {
+    report_form.jobgroup_options.options[i] = new Option(jobgroup_names[i], jobgroup_ids[i]);
+    if (job_group_id != '') {
+      if (job_group_id == jobgroup_ids[i]) report_form.jobgroup_options.options[i].selected = true;
+    }
+  }
+  if (jobgroup_ids.length == 1) report_form.jobgroup_options.options[0].selected = true;
+}
+
+function set_scan_options(remove=false) {
+  var jobgroup_id = document.getElementById("jobgroup_options").value;
+  console.log(jobgroup_id);
+  for (i = 0; i < scan_ids.length; i++) {
+    report_form.scan_options.options[i] = new Option(scan_names[i], scan_ids[i]);
+  }
+  if (remove) {
+      console.log(multipleCancelButton);
+  } else {
+    var multipleCancelButton = new Choices('#scan_options', {
+      removeItemButton: true,
+      maxItemCount:15,
+      searchResultLimit:15,
+      renderChoiceLimit:15,
+      shouldSort: false,
+      shouldSortItems: true
+    }); 
+  }
+}
+
+$("body").on('change', '#jobgroup_options', function(e){
+  e.preventDefault();
+  set_scan_options(remove=true);
+});
+
+$("body").on('change', '#scan_type', function(e){
+  e.preventDefault();
+  request_search(1);
+});
+
+$("body").on('change', '#order_by', function(e){
+  e.preventDefault();
+  request_search(1);
+});
+
+
+function make_list(data) {
+  var str = "";
+  if (data.length == 0)
+    str += '<tr><td colspan="6"><h4>데이터가 없습니다</h4></td></tr>';
+  current_data = data;
+  for (i in data) {
+    str += j_row_start();
+    tmp = data[i].id + '<br>';
+    tmp += ''+data[i].start_time + '<br>';
+    tmp += ''+data[i].end_time + '<br>';
+    str += j_col(2, tmp)
+
+    tmp = '<strong>'+data[i].name+'</strong>(';
+    tmp += data[i].desc+')<br>';
+    tmp += '&nbsp;&nbsp;대상호스트: '+data[i].host+'<br>';
+    tmp += '&nbsp;&nbsp;대상포트: ' +data[i].target_ports;
+    str += j_col(4, tmp);
+
+    if (data[i].open_ports == '' || data[i].open_ports == null) {
+      tmp = 'None'
+    } else {
+      tmp = data[i].open_ports.replace(/\|/g, ', ');
+    }
+    str += j_col(3, tmp);
+
+    tmp = 'TODO!'
+    //btn_str = j_button_tt('modify_job_btn', '수정', [{'key':'idx', 'value':i }], 'success', tooltip='스캔작업을 수정합니다.', pos='up-left');
+    //btn_str += j_button_tt('execute_job_btn', '실행', [{'key':'id', 'value':data[i].id }], 'info', tooltip='스캔작업 수동실행.', pos='up-right');
+    //tmp = j_button_group(btn_str)
+    str += j_col(3, tmp);
+    str += j_row_end();
+
+    if (i != data.length -1) str += j_hr();
+  }
+  $("#list_div").html(str);
+}
+
+function j_button_tt(id, text, data, outline_color, tooltip='', pos='down', size='medium') {
+  var str = '<button id="'+id+'" name="'+id+'" class="btn btn-sm btn-outline-'+outline_color+'" '
+  if (tooltip == '') str += ' aria-label="' +text+'"';
+  else str += ' aria-label="' +tooltip+'"';
+  str += ' data-balloon-pos="' +pos+ '" data-balloon-length="'+size+'"';
+  for ( var i in data) {
+    str += ' data-' + data[i].key + '="' + data[i].value+ '" '
+  }
+  str += '>' + text + '</button>';
+  return str;
+}
+
+$("body").on('click', '#basic_report_btn', function(e){
+  e.preventDefault();
+  var formData = getFormdata('#report_form');
+  globalSendCommandPage('basic_report', formData, null, null, function(ret){
+    if (ret.ret == 'success') {
+      window.location.href = "/portscan_report_download?path="+ret.data.path+"&name="+ret.data.name;
+    }
+    else {
+      notify(ret.data, 'warning');
+    }
+  });
+});
+
+
+
+
+</script>    
+{% endblock %}

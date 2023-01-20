@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block content %}
+
+{{ macros.m_row_start('0') }}
+{{ macros.m_row_end() }}
+<div>
+  <form id="form_search" name="from_search" class="form-inline" style="text-align:left">
+    <div class="container-fluid">
+      <div class="row show-grid">
+        <span class="col-md-5">
+          <select name="option1" id="option1" class="form-control form-control-sm">
+            <option value="all">작업구분</option>
+          </select>
+          <select name="option2" id="option2" class="form-control form-control-sm">
+          </select>
+          <select name="order" id="order" class="form-control form-control-sm">
+            <option value="desc">최근순</option>
+            <option value="asc">오래된순</option>
+          </select>
+        </span>
+        <span class="col-md-7">
+	      <input id="keyword" name="keyword" class="form-control form-control-sm w-75" type="text" placeholder="제목입력" aria-label="Search">
+          {{ macros.m_button_group([['globalSearchSearchBtn', '검색'], ['globalSearchResetBtn', '리셋']]) }}
+        </span>
+       </div>
+    </div>
+  </form>
+  <div id='page1'></div>
+  {{ macros.m_hr_head_top() }}
+  {{ macros.m_row_start('0') }}
+  {{ macros.m_col(2, macros.m_strong('ID/시작/종료시각')) }}
+  {{ macros.m_col(4, macros.m_strong('스캔대상')) }}
+  {{ macros.m_col(3, macros.m_strong('스캔결과')) }}
+  {{ macros.m_col(3, macros.m_strong('기능')) }}
+  {{ macros.m_row_end() }}
+  {{ macros.m_hr_head_bottom() }}
+  <div id="list_div"></div>
+  <div id='page2'></div>
+</div>
+
+<script type="text/javascript">
+var package_name = "{{arg['package_name'] }}";
+var sub = "{{arg['sub']}}";
+var current_data = null;
+var formData = null;
+var str_job_ids = "{{arg['job_ids']}}";
+var str_job_names = "{{arg['job_names']}}";
+var job_ids = str_job_ids.split('|');
+var job_names = str_job_names.split('|');
+var start_job_id = "{{arg['start_job_id']}}";
+
+var str_scan_ids = "{{arg['scan_ids']}}";
+var str_scan_names = "{{arg['scan_names']}}";
+var scan_ids = str_scan_ids.split('|');
+var scan_names = str_scan_names.split('|');
+var start_scan_id = "{{arg['start_scan_id']}}";
+
+$(document).ready(function(){
+  set_job_options();
+  set_scan_options();
+  globalRequestSearch('1');
+});
+
+function set_job_options() {
+  form_search.option1.options[0] = new Option('전체작업', 'all');
+  for (i = 0; i < job_ids.length; i++) {
+    form_search.option1.options[i+1] = new Option(job_names[i], job_ids[i]);
+    if (start_job_id != '') {
+      if (start_job_id == job_ids[i]) form_search.option1.options[i+1].selected = true;
+    }
+  }
+}
+
+function set_scan_options() {
+  form_search.option2.options[0] = new Option('전체', 'all');
+  for (i = 0; i < scan_ids.length; i++) {
+    form_search.option2.options[i+1] = new Option(scan_names[i], scan_ids[i]);
+    if (start_scan_id != '') {
+      if (start_scan_id == scan_ids[i]) form_search.option2.options[i+1].selected = true;
+    }
+  }
+}
+
+$("body").on('change', '#option1', function(e){
+  e.preventDefault();
+  globalRequestSearch(1);
+});
+
+$("body").on('change', '#option2', function(e){
+  e.preventDefault();
+  globalRequestSearch(1);
+});
+
+$("body").on('change', '#order_by', function(e){
+  e.preventDefault();
+  globalRequestSearch(1);
+});
+
+function get_job_name(job_id) {
+  return job_names[job_ids.indexOf(String(job_id))];
+}
+
+function get_scan_name(scan_id) {
+  return scan_names[scan_ids.indexOf(String(scan_id))];
+}
+
+function make_list(data) {
+  var str = "";
+  if (data.length == 0)
+    str += '<tr><td colspan="6"><h4>데이터가 없습니다</h4></td></tr>';
+  for (i in data) {
+    str += j_row_start();
+    tmp = data[i].id + '<br>';
+    tmp += ''+data[i].start_time + '<br>';
+    tmp += ''+data[i].end_time + '<br>';
+    str += j_col(2, tmp)
+
+    tmp = '<strong>'+get_job_name(data[i].scan_job_id)+'</strong> (';
+    tmp += get_scan_name(data[i].scan_execute_id)+')<br>';
+    tmp += '&nbsp;&nbsp;대상호스트: '+data[i].host+'<br>';
+    //tmp += '&nbsp;&nbsp;대상포트: ' +data[i].target_ports;
+    str += j_col(4, tmp);
+
+    if (data[i].open_ports == '' || data[i].open_ports == null) {
+      tmp = 'None'
+    } else {
+      tmp = data[i].open_ports.replace(/\|/g, ', ');
+    }
+    str += j_col(3, tmp);
+
+    btn_str = j_button_tt('globalJsonBtn', '상세정보', [{'key':'idx', 'value':i }], 'success', tooltip='상세정보를 확인합니다.', pos='up-left');
+    //btn_str += j_button_tt('execute_job_btn', '실행', [{'key':'id', 'value':data[i].id }], 'info', tooltip='스캔작업 수동실행.', pos='up-right');
+    tmp = j_button_group(btn_str)
+    str += j_col(3, tmp);
+    str += j_row_end();
+
+    if (i != data.length -1) str += j_hr();
+  }
+  $("#list_div").html(str);
+}
+
+function j_button_tt(id, text, data, outline_color, tooltip='', pos='down', size='medium') {
+  var str = '<button id="'+id+'" name="'+id+'" class="btn btn-sm btn-outline-'+outline_color+'" '
+  if (tooltip == '') str += ' aria-label="' +text+'"';
+  else str += ' aria-label="' +tooltip+'"';
+  str += ' data-balloon-pos="' +pos+ '" data-balloon-length="'+size+'"';
+  for ( var i in data) {
+    str += ' data-' + data[i].key + '="' + data[i].value+ '" '
+  }
+  str += '>' + text + '</button>';
+  return str;
+}
+
+function request_search(my, page, move_top=false) {
+  console.log('!!!!! request_search!!!');
+  var formData = getFormdata('#form_search');
+  globalSendCommandPage('web_list', formData, null, null, function(data) {
+    if (data.ret == 'success') {
+      if (move_top) window.scrollTo(0,0);
+      make_list(data.list)
+      make_page_html(data.paging)
+    }
+  });
+}
+
+</script>    
+{% endblock %}

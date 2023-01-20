@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div>
+  {{ macros.m_button_group([['globalSettingSaveBtn', '설정 저장']])}}
+  {{ macros.m_row_start('5') }}
+  {{ macros.m_row_end() }}
+  <form id='setting' name='setting'>
+  {{ macros.setting_input_int('max_thread_num', 'Scanner쓰레드수', value=arg['max_thread_num'], desc=['동시에 실행할 스캐너 Thread 수'], max='1024') }}
+  {{ macros.setting_input_int('scan_timeout_sec', '응답 Timeout', value=arg['scan_timeout_sec'], desc=['응답 Timeout 시간(초단위)']) }}
+  {{ macros.setting_input_textarea('except_target_hosts', '제외호스트', value=arg['except_target_hosts'], row="9", desc=['스캔시 대상에서 제외할 호스트 주소, ip주소 혹은 domain','여러개 입력시 구분자는 엔터, CIDR표기방식 지원']) }}
+  </form>
+</div> <!--전체-->
+
+<script type="text/javascript">
+var package_name = "{{arg['package_name'] }}";
+var sub = "{{arg['sub'] }}";
+
+$(document).ready(function(){
+});
+
+</script>    
+{% endblock %}

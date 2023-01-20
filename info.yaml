@@ -1,0 +1,7 @@
+title: "포트스캐너"
+version: "1.0.0"
+package_name: "portscan"
+developer: "orial"
+description: "포트스캐너"
+home: "https://github.com/byorial/portscan"
+more: "https://raw.githubusercontent.com/byorial/portscan/main/README.md"

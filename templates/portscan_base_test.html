@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div>
+  {{ macros.m_button_group([['globalSettingSaveBtn', '설정 저장']])}}
+  {{ macros.m_row_start('5') }}
+  {{ macros.m_row_end() }}
+  <form id='setting' name='setting'>
+  {{ macros.setting_input_text_and_buttons('default_test_ip', '대상호스트', [['chk_hosts_btn','확인']], value=arg['default_test_ip'],  desc=['스캔할 대상 호스트(domain/IP/network(CIDR))']) }}
+  {{ macros.setting_input_text_and_buttons('default_test_port', '대상포트', [['chk_ports_btn','확인']], value=arg['default_test_port'], desc=['스캔할 대상 포트, 포트번호를 지정하거나 상위포트 설정','포트번호지정방식: 80,443, 여러개입력시 구분자는 쉼표(,)','상위포트지정: T50, T100, T1000(주요서비스포트)']) }}
+  {{ macros.setting_input_text_and_buttons('default_test_message', '스캔테스트', [['scan_test_btn', '테스트실행']], desc='테스트 메시지 입력', value=arg['default_test_message']) }}
+  {{ macros.setting_input_textarea('test_result', '테스트결과', row='10', disabled=True) }}
+  </form>
+</div> <!--전체-->
+
+<script type="text/javascript">
+var package_name = "{{arg['package_name'] }}";
+var sub = "{{arg['sub'] }}";
+
+$(document).ready(function(){
+});
+
+$("body").on('click', '#scan_test_btn', function(e){
+  e.preventDefault();
+  globalSendCommandPage('scan_test', $("#default_test_ip").val(), $("#default_test_port").val(), null,function(ret) {
+    if (ret.ret == 'success') {
+      $('#test_result').val(ret.data);
+    }
+  });
+});
+
+$("body").on('click', '#chk_hosts_btn', function(e){
+  e.preventDefault();
+
+  target_hosts = $("#default_test_ip").val();
+  globalSendCommandPage('chk_hosts', target_hosts, null, null, function(ret){
+    if (ret.ret == 'success') {
+      var str = '확인결과: '+ret.data.length+'건\n';
+      for (i in ret.data) {
+        str += ret.data[i] + '\n';
+      }
+      $('#test_result').val(str);
+    }
+    else {
+      notify(ret.data, 'warning');
+      $('#test_result').val(ret.data);
+    }
+  });
+});
+
+$("body").on('click', '#chk_ports_btn', function(e){
+  e.preventDefault();
+
+  target_ports = $("#default_test_port").val();
+  globalSendCommandPage('chk_ports', target_ports, null, null, function(ret){
+    if (ret.ret == 'success') {
+      var str = '확인결과: '+ret.data.length+'건\n';
+      for (i in ret.data) {
+        str += ret.data[i] + '\n';
+      }
+      $('#test_result').val(str);
+    }
+    else {
+      notify(ret.data, 'warning');
+      $('#test_result').val(ret.data);
+    }
+  });
+});
+
+
+</script>    
+{% endblock %}
