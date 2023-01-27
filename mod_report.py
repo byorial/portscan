@@ -136,18 +136,23 @@ class PageCompareReport(PluginPageBase):
         arg['jobgroup_ids'] = '|'.join(list(str(x.id) for x in groups))
         arg['jobgroup_names'] = '|'.join(list(str(x.name) for x in groups))
         jobs = ModelScanJobItem.get_all_items()
-        scans = ModelScanItem.get_all_items()
+        scans = ModelScanItem.get_list_by_status('END', by_dict=True)
+        logger.info(f'[scans] {scans}')
         arg['job_names'] = '|'.join(list(x.name for x in jobs))
         arg['job_ids'] = '|'.join(list(str(x.id) for x in jobs))
-        arg['scan_ids'] = '|'.join(list(str(x.id) for x in scans))
+        arg['scan_ids'] = '|'.join(list(str(x['id']) for x in scans))
         if 'keyword' in req.args: arg['keyword'] = req.args.get('keyword')
         scan_names = []
         for _s in scans:
-            scan_name = ModelScanJobItem.get_by_id(_s.scan_job_id).name + datetime.strftime(_s.start_time, '-%y/%m/%d %H:%M')
+            scan_name = ModelScanJobItem.get_by_id(_s['scan_job_id']).name +'-'+ _s['start_time']
             scan_names.append(scan_name)
+            _s['name'] = scan_name
+
+        scans.sort(key = lambda x:x['name'])
+
         arg['scan_names'] = '|'.join(scan_names)
         if 'scan_id' in req.args: arg['start_scan_id'] = req.args.get('scan_id')
-        return render_template(f'{self.P.package_name}_{self.parent.name}_{self.name}.html', arg=arg)
+        return render_template(f'{self.P.package_name}_{self.parent.name}_{self.name}.html', arg=arg, scan_items=scans)
 
     def _arg_to_dict(self, arg):
         import html
@@ -195,6 +200,7 @@ class PageCompareReport(PluginPageBase):
             logger.info(f'[compare_report] fname: {fname}')
 
             columns = list(x.upper() for x in ModelScanResultItem.__table__.columns.keys())
+            #columns = ['호스트', '스캔결과(이전)', '스캔결과(이후)', '스캔결과비교', '이전스캔시각', '이후스캔시각']
             items = ModelScanResultItem.get_list_for_report(req)
 
             contents = []

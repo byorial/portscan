@@ -15,7 +15,7 @@ class ModuleScan(PluginModuleBase):
         }
 
         #self.set_page_list([PageScanStatus, PageScanResult])
-        self.set_page_list([PageScanStatus])
+        self.set_page_list([PageGroupScanStatus, PageScanStatus])
         self.web_list_model = ModelScanResultItem
 
     def process_menu(self, page, req):
@@ -50,6 +50,30 @@ class ModuleScan(PluginModuleBase):
         elif command == 'chk_ports':
             ret = ScanUtils.get_port_details(arg1)
         return jsonify(ret)
+
+
+class PageGroupScanStatus(PluginPageBase):
+
+    def __init__(self, P, parent):
+        super(PageGroupScanStatus, self).__init__(P, parent, name='group_status')
+
+    def process_menu(self, req):
+        arg = P.ModelSetting.to_dict()
+        logger.info(f'[scan_status] req({req}, {req.args})')
+        jobs = ModelScanJobItem.get_all_items()
+        arg['job_names'] = '|'.join(list(x.name for x in jobs))
+        arg['job_ids'] = '|'.join(list(str(x.id) for x in jobs))
+        if 'job_id' in req.args: arg['start_job_id'] = req.args.get('job_id')
+        return render_template(f'{self.P.package_name}_{self.parent.name}_{self.name}.html', arg=arg)
+
+    def process_command(self, command, arg1, arg2, arg3, req):
+        ret = {'ret':'success'}
+        data = None
+        logger.info(f'[page_status] process_command: {command}, {arg1}, {req}')
+        if command == 'web_list':
+            ret = ModelGroupScanItem.web_list(self.arg_to_dict(arg1))
+        return jsonify(ret)
+
 
 class PageScanStatus(PluginPageBase):
 

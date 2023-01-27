@@ -27,7 +27,8 @@ setting = {
                 'uri': 'scan',
                 'name': '스캔',
                 'list': [
-                    {'uri': 'status', 'name': '스캔상태'},
+                    {'uri': 'group_status', 'name': '그룹스캔작업'},
+                    {'uri': 'status', 'name': '스캔작업'},
                     {'uri': 'result', 'name': '스캔결과'},
                 ]
             },
@@ -39,7 +40,7 @@ setting = {
                     {'uri': 'compare', 'name': '비교보고서(개발중)'},
                 ]
             },
-            {'uri': 'READMI.md', 'name': '매뉴얼'},
+            {'uri': 'README.md', 'name': '매뉴얼'},
             {'uri': 'log', 'name': '로그'},
         ]
     },

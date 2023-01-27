@@ -44,6 +44,10 @@ class ModuleJob(PluginModuleBase):
             ret = ScanUtils.add_job(P.logic.arg_to_dict(arg1))
         elif command == 'job_modify':
             ret = ScanUtils.modify_job(P.logic.arg_to_dict(arg1))
+        elif command == 'job_remove':
+            logger.info(f'[job_remove] job_id: {arg1}')
+            ModelScanJobItem.delete_by_id(int(arg1))
+            ret = {'ret':'success'}
         elif command == 'job_execute':
             call_id = f'portscan_job_{arg1}'
             process = SupportSubprocess.get_instance_by_call_id(call_id)
@@ -121,4 +125,20 @@ class PageScanJobGroup(PluginPageBase):
             ret = ScanUtils.modify_jobgroup(P.logic.arg_to_dict(arg1))
         elif command == 'web_list':
             ret = ModelScanJobGroupItem.web_list(P.logic.arg_to_dict(arg1))
+        elif command == 'jobgroup_execute':
+            call_id = f'portscan_jobgroup_{arg1}'
+            process = SupportSubprocess.get_instance_by_call_id(call_id)
+            if process != None:
+                ret['data'] = '이미 실행중입니다.'
+                ret['ret'] = 'warning'
+                return jsonify(ret)
+
+            ret = {'ret':'success', 'data':arg1 }
+            th = threading.Thread(target=ScanUtils.execute_jobgroup, args=(arg1))
+            th.setDaemon(True)
+            th.start()
+        elif command == 'jobgroup_remove':
+            logger.info(f'[jobgroup_remove] jobgroup_id: {arg1}')
+            ModelScanJobGroupItem.delete_by_id(int(arg1))
+            ret = {'ret':'success'}
         return jsonify(ret)

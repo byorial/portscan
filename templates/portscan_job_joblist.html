@@ -20,7 +20,7 @@
   {{ macros.m_row_start('0') }}
   {{ macros.m_col(2, macros.m_strong('ID/시각')) }}
   {{ macros.m_col(4, macros.m_strong('제목/설명')) }}
-  {{ macros.m_col(3, macros.m_strong('자동/스케쥴')) }}
+  {{ macros.m_col(3, macros.m_strong('스케쥴정보')) }}
   {{ macros.m_col(3, macros.m_strong('기능')) }}
   {{ macros.m_row_end() }}
   {{ macros.m_hr_head_bottom() }}
@@ -42,7 +42,7 @@
       {{ macros.setting_input_text_and_buttons('target_hosts', '타겟IP', [['chk_hosts_btn', '확인']]) }}
       {{ macros.setting_input_text_and_buttons('target_ports', '타겟포트', [['chk_ports_btn', '확인']]) }}
       {{ macros.setting_input_text('desc', '작업설명') }}
-      {{ macros.setting_radio_with_value('schedule_mode', '스케쥴링 타입', [['none', '없음'], ['startup', '시작시 한번 실행'], ['scheduler', '스케쥴링']]) }}
+      {{ macros.setting_radio_with_value('schedule_mode', '스케쥴링 타입', [['none', '없음'], ['jobgroup', '작업그룹에포함'], ['startup', '시작시 한번 실행'], ['scheduler', '스케쥴링']]) }}
       {{ macros.setting_input_text('schedule_interval', '스케쥴링 정보', desc=['Interval(minute 단위)이나 Cron 설정']) }}
       {{ macros.setting_checkbox('schedule_auto_start', '시작시 스케쥴링 등록', desc=['On : 시작시 자동으로 스케쥴러에 등록됩니다.']) }}
 	</form>
@@ -71,7 +71,7 @@
       {{ macros.setting_input_text_and_buttons('m_target_hosts', '타겟IP', [['m_chk_hosts_btn','확인']]) }}
       {{ macros.setting_input_text_and_buttons('m_target_ports', '타겟포트', [['m_chk_ports_btn', '확인']]) }}
       {{ macros.setting_input_text('m_desc', '작업설명') }}
-      {{ macros.setting_radio_with_value('m_schedule_mode', '스케쥴링 타입', [['none', '없음'], ['startup', '시작시 한번 실행'], ['scheduler', '스케쥴링']]) }}
+      {{ macros.setting_radio_with_value('m_schedule_mode', '스케쥴링 타입', [['none', '없음'], ['jobgroup', '작업그룹에포함'], ['startup', '시작시 한번 실행'], ['scheduler', '스케쥴링']]) }}
       {{ macros.setting_input_text('m_schedule_interval', '스케쥴링 정보', desc=['Interval(minute 단위)이나 Cron 설정']) }}
       {{ macros.setting_checkbox('m_schedule_auto_start', '시작시 스케쥴링 등록', desc=['On : 시작시 자동으로 스케쥴러에 등록됩니다.']) }}
 	</form>
@@ -127,8 +127,17 @@ function make_list(data) {
     } else {
       tmp = '자동시작: Off<br>';
     }
-    tmp += '실행주기: '+data[i].schedule_interval+'<br>';
-    tmp += '실행모드: '+data[i].schedule_mode;
+    tmp += '실행모드: ';
+    if (data[i].schedule_mode == 'none') {
+      tmp += '스케쥴링 없음';
+    } else if (data[i].schedule_mode == 'jobgroup') {
+      tmp += '작업그룹에포함';
+    } else if (data[i].schedule_mode == 'scheduler') {
+      tmp += '스케쥴링';
+    } else {
+      tmp += '-';
+    }
+    tmp += '<br>실행주기: '+data[i].schedule_interval;
     str += j_col(3, tmp);
 
     btn_str = j_button_tt('modify_job_btn', '수정', [{'key':'idx', 'value':i }], 'success', tooltip='스캔작업을 수정합니다.', pos='up-left');
@@ -185,10 +194,12 @@ $("body").on('click', '#modify_job_btn', function(e) {
   document.getElementById('m_desc').value = job.desc;
   if (job.schedule_mode == 'none') {
     $("#m_schedule_mode0").prop("checked", true);
-  } else if (job.schedule_mode == 'startup') {
+  } else if (job.schedule_mode == 'jobgroup') {
     $("#m_schedule_mode1").prop("checked", true);
-  } else {
+  } else if (job.schedule_mode == 'startup') {
     $("#m_schedule_mode2").prop("checked", true);
+  } else {
+    $("#m_schedule_mode3").prop("checked", true);
   }
   //document.getElementById('m_schedule_mode').value = job.schedule_mode;
   document.getElementById('m_schedule_interval').value = job.schedule_interval;
@@ -246,6 +257,24 @@ $("body").on('click', '#job_save_btn', function(e){
     }
   });
 });
+
+$("body").on('click', '#job_remove_btn', function(e){
+  e.preventDefault();
+  job_id = document.getElementById('jobid').value;
+  job_name = document.getElementById('m_name').value;
+  console.log(job_id);
+  globalConfirmModal('작업 삭제', job_name+'('+job_id+') 작업을 삭제하시겠습니까?', function() {
+    globalSendCommand('job_remove', job_id, null, null, function(ret){
+      if (ret.ret == 'success') {
+        $('#job_modify_modal').modal('hide');
+        globalRequestSearch(current_page);
+      } else {
+        notify(job_id+" 작업 삭제 실패", 'warning');
+      }
+    });
+  });
+});
+
 
 
 $("body").on('click', '#job_modify_btn', function(e){

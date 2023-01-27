@@ -119,14 +119,42 @@ class ScanUtils:
     def add_jobgroup(info):
         logger.info(f'[add_jobgroup] {info}')
         db_item = ModelScanJobGroupItem(info['name'], info['desc'])
+        db_item.schedule_mode = info['schedule_mode']
+        db_item.schedule_auto_start = True if info['schedule_auto_start'] == 'True' else False
+        db_item.schedule_intarval = info['schedule_intarval']
         db_item.save()
-        return {'ret':'success', 'data':{'id':db_item.id}}
+        try:
+            if info['schedule_mode'] == 'scheduler':
+                sch_id = f'portscan_jobgroup_{db_item.id}'
+                if not scheduler.is_include(sch_id):
+                    job = Job(P.package_name, db_item.schedule_interval, ScanUtils.execute_jobgroup, db_item.desc, arg=(db_item.id, True))
+                    scheduler.add_job_instance(job)
+
+            return {'ret':'success', 'data':{'id':db_item.id}}
+        except Exception as e:
+            logger.error(f'Exception: {str(e)}')
+            logger.error(traceback.format_exc())
+            return {'ret':'success', 'data':{'exception':f'{str(e)}'}}
 
     def modify_jobgroup(info):
         logger.info(f'[modify_jobgroup] {info}')
-        db_item = ModelScanJobGroupItem.get_by_id(info['jobid'])
+        db_item = ModelScanJobGroupItem.get_by_id(info['jobgroup_id'])
         db_item.name = info['m_name']
         db_item.desc = info['m_desc']
+        db_item.schedule_mode = info['m_schedule_mode']
+        db_item.schedule_auto_start = True if info['m_schedule_auto_start'] == 'True' else False
+        db_item.schedule_interval = info['m_schedule_interval']
+
+        sch_id = f'portscan_jobgroup_{info["jobgroup_id"]}'
+        if info['m_schedule_mode'] != 'scheduler':
+            logger.debug(f'[modify_job] 스캐쥴링 모드 변경으로 작업삭제({info["m_schedule_mode"]}/{sch_id})')
+            F.scheduler.remove_job(sch_id)
+        else:
+            if scheduler.is_include(sch_id): F.scheduler.remove_job(sch_id)
+            job = Job(P.package_name, sch_id, db_item.schedule_interval, ScanUtils.execute_jobgroup, db_item.desc, args=(db_item.id,))
+            scheduler.add_job_instance(job)
+            logger.debug(f'[modify_jobgroup] 스캐쥴링 작업추가({info["m_schedule_mode"]}/{sch_id})')
+
         db_item.save()
         return {'ret':'success', 'data':{'id':db_item.id}}
 
@@ -192,6 +220,22 @@ class ScanUtils:
         for k,v in result.items():
             if v == 'OPEN': open_ports.append(str(k))
         return '|'.join(open_ports)
+
+    def execute_jobgroup(jobgroup_id):
+        try:
+            logger.debug(f'[execute-grp] START {jobgroup_id}')
+            jobgroup = ModelScanJobGroupItem.get_by_id(int(jobgroup_id))
+            logger.debug(f'[execute-grp] {jobgroup.id},{jobgroup.name}')
+            jobs = ModelScanJobItem.get_job_list_by_jobgroup(jobgroup.id)
+            for job in jobs:
+                logger.debug(f'[execute-grp] 쓰레드로 작업 실행 {job.name},{job.desc},{job.target_hosts}')
+                th = threading.Thread(target=ScanUtils.execute_job, args=(str(job.id)))
+                th.setDaemon(True)
+                th.start()
+            logger.debug(f'[execute-grp] END {jobgroup_id}')
+        except Exception as e:
+            logger.error(f'Exception: {str(e)}')
+            logger.error(traceback.format_exc())
 
     def execute_job(job_id):
         try:

@@ -20,7 +20,8 @@
   {{ macros.m_hr_head_top() }}
   {{ macros.m_row_start('0') }}
   {{ macros.m_col(2, macros.m_strong('ID/등록시각')) }}
-  {{ macros.m_col(8, macros.m_strong('제목/설명')) }}
+  {{ macros.m_col(4, macros.m_strong('제목/설명')) }}
+  {{ macros.m_col(4, macros.m_strong('스케쥴정보')) }}
   {{ macros.m_col(2, macros.m_strong('기능')) }}
   {{ macros.m_row_end() }}
   {{ macros.m_hr_head_bottom() }}
@@ -39,6 +40,9 @@
 	<form id="scanjob_register_form" name="scanjob_register_form">
       {{ macros.setting_input_text('name', '작업그룹명') }}
       {{ macros.setting_input_text('desc', '작업설명') }}
+      {{ macros.setting_radio_with_value('schedule_mode', '스케쥴링 타입', [['none', '없음'], ['startup', '시작시 한번 실행'], ['scheduler', '스케쥴링']]) }}
+      {{ macros.setting_input_text('schedule_interval', '스케쥴링 정보', desc=['Interval(minute 단위)이나 Cron 설정']) }}
+      {{ macros.setting_checkbox('schedule_auto_start', '시작시 스케쥴링 등록', desc=['On : 시작시 자동으로 스케쥴러에 등록됩니다.']) }}
 	</form>
       </div>
       <div class="modal-footer" style="align-items:right;">
@@ -58,9 +62,12 @@
       </div>
       <div class="modal-body" id="modal_body" style="word-break:break-all;">
 	<form id="scanjob_modify_form" name="scanjob_modify_form">
-      <input type='hidden' id="jobid" name="jobid">
+      <input type='hidden' id="jobgroup_id" name="jobgroup_id">
       {{ macros.setting_input_text('m_name', '작업그룹명') }}
       {{ macros.setting_input_text('m_desc', '작업설명') }}
+      {{ macros.setting_radio_with_value('m_schedule_mode', '스케쥴링 타입', [['none', '없음'], ['startup', '시작시 한번 실행'], ['scheduler', '스케쥴링']]) }}
+      {{ macros.setting_input_text('m_schedule_interval', '스케쥴링 정보', desc=['Interval(minute 단위)이나 Cron 설정']) }}
+      {{ macros.setting_checkbox('m_schedule_auto_start', '시작시 스케쥴링 등록', desc=['On : 시작시 자동으로 스케쥴러에 등록됩니다.']) }}
 	</form>
       </div>
       <div class="modal-footer" style="align-items:right;">
@@ -96,9 +103,29 @@ function make_list(data) {
 
     tmp = '<strong>제목: '+data[i].name+'</strong><br>';
     tmp += '설명: '+data[i].desc+'<br>';
-    str += j_col(8, tmp);
+    str += j_col(4, tmp);
+
+    if (data[i].schedule_auto_start == true) {
+      tmp = '자동시작: On<br>';
+    } else {
+      tmp = '자동시작: Off<br>';
+    }
+    tmp += '실행모드: ';
+    if (data[i].schedule_mode == 'none') {
+        tmp += '스케쥴링 없음';
+    } else if (data[i].schedule_mode == 'startup') {
+        tmp += '시작시실행';
+    } else if (data[i].schedule_mode == 'scheduler') {
+        tmp += '스케쥴링';
+    } else {
+        tmp += '-';
+    }
+    tmp += '<br>실행주기: '+data[i].schedule_interval+'<br>';
+    str += j_col(4, tmp);
 
     btn_str = j_button_tt('modify_job_btn', '수정', [{'key':'idx', 'value':i }], 'success', tooltip='스캔작업을 수정합니다.', pos='up-left');
+
+    btn_str += j_button_tt('execute_jobgroup_btn', '수동실행', [{'key':'id', 'value':data[i].id }], 'info', tooltip='스캔작업그룹 수동실행.', pos='up-right');
     tmp = j_button_group(btn_str)
     str += j_col(2, tmp);
     str += j_row_end();
@@ -116,9 +143,18 @@ $("body").on('click', '#modify_job_btn', function(e) {
   e.preventDefault();
   idx = $(this).data('idx');
   job = current_data[idx];
-  document.getElementById('jobid').value = job.id;
+  document.getElementById('jobgroup_id').value = job.id;
   document.getElementById('m_name').value = job.name;
   document.getElementById('m_desc').value = job.desc;
+  if (job.schedule_mode == 'none') {
+    $("#m_schedule_mode0").prop("checked", true);
+  } else if (job.schedule_mode == 'startup') {
+    $("#m_schedule_mode1").prop("checked", true);
+  } else {
+    $("#m_schedule_mode2").prop("checked", true);
+  }
+  document.getElementById('m_schedule_interval').value = job.schedule_interval;
+  document.getElementById('m_schedule_auto_start').value = job.schedule_auto_start;
   $("#jobgroup_modify_modal").modal();
 });
 
@@ -189,7 +225,24 @@ $("body").on('click', '#jobgroup_modify_btn', function(e){
 });
 
 
-function request_search(my, page, move_top=false) {
+$("body").on('click', '#jobgroup_remove_btn', function(e){
+  e.preventDefault();
+  jobgroup_id = document.getElementById('jobgroup_id').value;
+  jobgroup_name = document.getElementById('m_name').value;
+  globalConfirmModal('작업그룹삭제', jobgroup_name+'('+jobgroup_id+') 작업그룹을 삭제하시겠습니까?', function() {
+    globalSendCommandPage('jobgroup_remove', jobgroup_id, null, null, function(ret){
+      if (ret.ret == 'success') {
+        $('#jobgroup_modify_modal').modal('hide');
+        request_search(current_page);
+      } else {
+        notify(job_id+" 작업 삭제 실패", 'warning');
+      }
+    });
+  });
+});
+
+
+function request_search(page, move_top=false) {
   var formData = getFormdata('#form_search');
   globalSendCommandPage('web_list', formData, null, null, function(data) {
     if (data.ret == 'success') {
@@ -199,5 +252,23 @@ function request_search(my, page, move_top=false) {
     }
   });
 }
+
+$("body").on('click', '#execute_jobgroup_btn', function(e){
+  e.preventDefault();
+  jobgroup_id = $(this).data('id');
+  globalConfirmModal('작업그룹실행', '작업그룹에 포함된 스캔작업을 실행하시겠습니까?', function() {
+    globalSendCommandPage('jobgroup_execute', jobgroup_id, null, null, function(ret){
+      if (ret.ret == 'success') {
+        notify(ret.data, 'success');
+        window.location.href = '/portscan/scan/group_status?jobgroup_id=' + ret.data;
+      }
+      else {
+        notify(ret.data, 'warning');
+      }
+    });
+  });
+});
+
+
 </script>    
 {% endblock %}

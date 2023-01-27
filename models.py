@@ -12,10 +12,17 @@ class ModelScanJobGroupItem(ModelBase):
     name = db.Column(db.String)
     desc = db.Column(db.String)
 
+    schedule_mode = db.Column(db.String)
+    schedule_auto_start = db.Column(db.Boolean)
+    schedule_interval = db.Column(db.String)
+    status = db.Column(db.String)
+
+
     def __init__(self, name, desc):
         self.created_time = datetime.now()
         self.name = name
         self.desc = desc
+        self.status = 'READY'
 
     @classmethod
     def get_all_items(cls):
@@ -106,6 +113,14 @@ class ModelScanJobItem(ModelBase):
         return db.session.query(cls).all()
 
     @classmethod
+    def get_job_list_by_jobgroup(cls, jobgroup_id, schedule_mode='jobgroup'):
+        with F.app.app_context():
+            query = db.session.query(cls)
+            query = query.filter_by(job_group_id=jobgroup_id)
+            query = query.filter_by(schedule_mode=schedule_mode)
+            return query.all()
+
+    @classmethod
     def get_job_list(cls):
         return super().get_list(by_dict=True)
 
@@ -146,6 +161,82 @@ class ModelScanJobItem(ModelBase):
         return ret
     """
 
+class ModelGroupScanItem(ModelBase):
+    P = P
+    __tablename__ = 'group_scan_item'
+    __table_args__ = {'mysql_collate': 'utf8_general_ci'}
+    __bind_key__ = P.package_name
+
+    id = db.Column(db.Integer, primary_key=True)
+    created_time = db.Column(db.DateTime)
+
+    job_group_id = db.Column(db.Integer)
+    scan_job_ids = db.Column(db.JSON)
+    execute_time = db.Column(db.DateTime)
+
+    def __init__(self, scan_job_id):
+        self.created_time = datetime.now()
+
+    def as_dict(self):
+        return {x.name: getattr(self, x.name).strftime('%Y-%m-%d %H:%M:%S') if isinstance(getattr(self, x.name), datetime) else getattr(self, x.name) for x in self.__table__.columns}
+
+    @classmethod
+    def get_list_by_job_group_id(cls, job_group_id, by_dict=False):
+        tmp = db.session.query(cls).filter_by(job_group_id=job_group_id)
+        if by_dict: tmp = [x.as_dict() for x in tmp]
+        return tmp
+
+    @classmethod
+    def get_all_items(cls, order='desc'):
+        query = db.session.query(cls)
+        if order == 'desc': query = query.order_by(desc(cls.id))
+        else: query = query.order_by(asc(cls.id))
+        return query.all()
+
+    @classmethod
+    def make_query(cls, req, order='desc', search='', option1='all', option2='all'):
+        with F.app.app_context():
+            query = db.session.query(cls)
+            logger.debug(f'[mkquery] {order}, {search}, {option1}, {option2}')
+
+            """
+            if option1 != 'all':
+                query = query.filter(cls.scan_job_id == option1)
+            if option2 != 'all':
+                query = query.filter(cls.status == option2)
+            """
+            query = query.order_by(desc(cls.id)) if order == 'desc' else query.order_by(cls.id)
+            return query
+
+    @classmethod
+    def web_list(cls, req):
+        logger.info(f'[web_list] {req}')
+        try:
+            ret = {}
+            page = 1
+            page_size = 30
+            search = ''
+            if 'page' in req:
+                page = int(req['page'])
+            if 'keyword' in req:
+                search = req['keyword'].strip()
+            option1 = req.get('job_type', 'all')
+            option2 = req.get('status_type', 'all')
+            order = req['order_by'] if 'order_by' in req else 'desc'
+
+            query = cls.make_query(req, order=order, search=search, option1=option1, option2=option2)
+            count = query.count()
+            query = query.limit(page_size).offset((page-1)*page_size)
+            lists = query.all()
+            ret['list'] = [item.as_dict() for item in lists]
+            ret['paging'] = cls.get_paging_info(count, page, page_size)
+            ret['ret'] = 'success'
+        except Exception as e:
+            logger.error(f'Exception:{str(e)}')
+            logger.error(traceback.format_exc())
+            ret['ret'] = 'error'
+        return ret
+
 class ModelScanItem(ModelBase):
     P = P
     __tablename__ = 'scan_item'
@@ -167,6 +258,9 @@ class ModelScanItem(ModelBase):
         self.created_time = datetime.now()
         self.scan_job_id = scan_job_id
         self.status = 'READY'
+
+    def as_dict(self):
+        return {x.name: getattr(self, x.name).strftime('%Y-%m-%d %H:%M:%S') if isinstance(getattr(self, x.name), datetime) else getattr(self, x.name) for x in self.__table__.columns}
 
     @classmethod
     def get_by_scan_job_id(cls, scan_job_id):
