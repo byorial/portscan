@@ -113,10 +113,10 @@ class ModelScanJobItem(ModelBase):
         return db.session.query(cls).all()
 
     @classmethod
-    def get_job_list_by_jobgroup(cls, jobgroup_id, schedule_mode='jobgroup'):
+    def get_job_list_by_jobgroup(cls, jobgroup_id=-1, schedule_mode='jobgroup'):
         with F.app.app_context():
             query = db.session.query(cls)
-            query = query.filter_by(job_group_id=jobgroup_id)
+            if jobgroup_id != -1: query = query.filter_by(job_group_id=jobgroup_id)
             query = query.filter_by(schedule_mode=schedule_mode)
             return query.all()
 

@@ -12,6 +12,13 @@ class ModuleBase(PluginModuleBase):
         super(ModuleBase, self).__init__(P, name='base', first_menu='setting')
         self.db_default = {
             f'portscan_db_version' : '1',
+            f'max_thread_num' : '1000',
+            f'scan_timeout_sec' : '5',
+            f'except_target_hosts' : '',
+            f'default_test_ip' : '127.0.0.1',
+            f'default_test_port' : 'T1000',
+            f'default_test_message' : 'test_message',
+            f'report_file_path' : '/data/report',
         }
         self.set_page_list([PageScanSetting, PageScanTest])
         self.web_list_model = None
@@ -37,15 +44,6 @@ class ModuleBase(PluginModuleBase):
 class PageScanSetting(PluginPageBase):
     def __init__(self, P, parent):
         super(PageScanSetting, self).__init__(P, parent, name='base')
-        self.db_default = {
-            f'max_thread_num' : '100',
-            f'scan_timeout_sec' : '5',
-            f'except_target_hosts' : '',
-            f'default_test_ip' : '127.0.0.1',
-            f'default_test_port' : 'T100',
-            f'default_test_message' : 'test_message',
-            f'report_file_path' : '/data/report',
-        }
 
     def process_menu(self, req):
         arg = P.ModelSetting.to_dict()

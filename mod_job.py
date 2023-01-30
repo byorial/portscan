@@ -10,9 +10,6 @@ class ModuleJob(PluginModuleBase):
 
     def __init__(self, P):
         super(ModuleJob, self).__init__(P, name='job', first_menu='joblist')
-        self.db_default = {
-            f'portscan_db_version' : '1',
-        }
 
         self.set_page_list([PageScanJobGroup])
         self.web_list_model = ModelScanJobItem

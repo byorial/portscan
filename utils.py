@@ -226,8 +226,18 @@ class ScanUtils:
             logger.debug(f'[execute-grp] START {jobgroup_id}')
             jobgroup = ModelScanJobGroupItem.get_by_id(int(jobgroup_id))
             logger.debug(f'[execute-grp] {jobgroup.id},{jobgroup.name}')
-            jobs = ModelScanJobItem.get_job_list_by_jobgroup(jobgroup.id)
+            jobs = ModelScanJobItem.get_job_list_by_jobgroup(jobgroup_id=jobgroup.id)
             for job in jobs:
+                call_id = f'portscan_job_{job.id}'
+                process = SupportSubprocess.get_instance_by_call_id(call_id)
+                if process != None:
+                    logger.info(f'[execute-grp] SKIP! 이미 실행중인 작업: {call_id}')
+                    continue
+
+                """
+                job = Job(P.package_name, db_item.schedule_interval, ScanUtils.execute_job, db_item.desc, arg=(db_item.id, True))
+                scheduler.add_job_instance(job)
+                """
                 logger.debug(f'[execute-grp] 쓰레드로 작업 실행 {job.name},{job.desc},{job.target_hosts}')
                 th = threading.Thread(target=ScanUtils.execute_job, args=(str(job.id)))
                 th.setDaemon(True)
