@@ -58,9 +58,19 @@ input.search-input{
 </div>
 
 <div class="mt-3 mb-3">
+ <form id="report_form" class="form-inline">
+  <div class="row show-grid">
+    <span class="col-md-8">
+      <select name="jobgroups" id="jobgroups" class="form-control form-control-sm">
+      </select>
+      <select name="port_options" id="port_options" class="form-control form-control-sm">
+        <option value="all">전체호스트</option>
+        <option value="open">열린포트</option>
+      </select>
+    </span>
+  </div>
   <div class="container">
     <center>
-      <form id="report_form">
       <select multiple="multiple" class="searchable" name="scan_list">
       {% for item in scan_items %}
       <option value="{{ item.id }}">{{ item.name }}</option>
@@ -69,9 +79,9 @@ input.search-input{
       <div class="mt-3" align="right">
       {{ macros.m_button("compare_report_btn", "보고서받기") }}
       </div>
-      </form>
     </center>
   </div>
+ </form>
 </div>
 
 <script type="text/javascript">
@@ -96,21 +106,20 @@ $(document).ready(function(){
   console.log(scan_ids);
   console.log(scan_names);
   set_jobgroup_options();
-  set_scan_options();
 });
 
 function set_jobgroup_options(job_group_id = '') {
   for (i = 0; i < jobgroup_ids.length; i++) {
-    report_form.jobgroup_options.options[i] = new Option(jobgroup_names[i], jobgroup_ids[i]);
+    report_form.jobgroups.options[i] = new Option(jobgroup_names[i], jobgroup_ids[i]);
     if (job_group_id != '') {
-      if (job_group_id == jobgroup_ids[i]) report_form.jobgroup_options.options[i].selected = true;
+      if (job_group_id == jobgroup_ids[i]) report_form.jobgroups.options[i].selected = true;
     }
   }
-  if (jobgroup_ids.length == 1) report_form.jobgroup_options.options[0].selected = true;
+  if (jobgroup_ids.length == 1) report_form.jobgroups.options[0].selected = true;
 }
 
 function set_scan_options(remove=false) {
-  var jobgroup_id = document.getElementById("jobgroup_options").value;
+  var jobgroup_id = document.getElementById("jobgroups").value;
   console.log(jobgroup_id);
   for (i = 0; i < scan_ids.length; i++) {
     report_form.scan_options1.options[i] = new Option(scan_names[i], scan_ids[i]);
@@ -142,7 +151,7 @@ function get_scan_name(scan_job_id) {
   return scan_names[scan_ids.indexOf(String(scan_job_id))];
 }
 
-$("body").on('change', '#jobgroup_options', function(e){
+$("body").on('change', '#jobgroups', function(e){
   e.preventDefault();
   set_scan_options(remove=true);
 });

@@ -29,6 +29,16 @@ class ModelScanJobGroupItem(ModelBase):
         return db.session.query(cls).all()
 
     @classmethod
+    def get_scheduled_items(cls):
+        from support import SupportSubprocess
+        items = super().get_list(by_dict=True)
+        for item in items:
+            item['is_include'] = F.scheduler.is_include(f'portscan_jobgroup_{item["id"]}')
+            item['is_running'] = F.scheduler.is_running(f'portscan_jobgroup_{item["id"]}')
+            item['process'] = (SupportSubprocess.get_instance_by_call_id(f'portscan_jobgroup_{item["id"]}') != None)
+        return items
+
+    @classmethod
     def make_query(cls, req, order='desc', search='', option1='all', option2='all'):
         with F.app.app_context():
             query = db.session.query(cls)
@@ -174,15 +184,20 @@ class ModelGroupScanItem(ModelBase):
     scan_job_ids = db.Column(db.JSON)
     execute_time = db.Column(db.DateTime)
 
-    def __init__(self, scan_job_id):
+    def __init__(self, job_group_id):
+        job_group_id = job_group_id
         self.created_time = datetime.now()
 
     def as_dict(self):
         return {x.name: getattr(self, x.name).strftime('%Y-%m-%d %H:%M:%S') if isinstance(getattr(self, x.name), datetime) else getattr(self, x.name) for x in self.__table__.columns}
 
     @classmethod
-    def get_list_by_job_group_id(cls, job_group_id, by_dict=False):
-        tmp = db.session.query(cls).filter_by(job_group_id=job_group_id)
+    def get_list_by_job_group_id(cls, job_group_id=-1, by_dict=False):
+        if job_group_id != -1:
+            tmp = db.session.query(cls).filter_by(job_group_id=job_group_id)
+        else:
+            tmp = db.session.query(cls)
+        tmp = tmp.order_by(desc(cls.created_time))
         if by_dict: tmp = [x.as_dict() for x in tmp]
         return tmp
 
@@ -248,6 +263,7 @@ class ModelScanItem(ModelBase):
 
     scan_job_id = db.Column(db.Integer)
     job_group_id = db.Column(db.Integer)
+    job_group_scan_id = db.Column(db.Integer)
     start_time = db.Column(db.DateTime)
     num_hosts = db.Column(db.Integer)
     curr_host = db.Column(db.Integer)
@@ -273,6 +289,12 @@ class ModelScanItem(ModelBase):
     @classmethod
     def get_list_by_job_group_id(cls, job_group_id, by_dict=False):
         tmp = db.session.query(cls).filter_by(job_group_id=job_group_id)
+        if by_dict: tmp = [x.as_dict() for x in tmp]
+        return tmp
+
+    @classmethod
+    def get_list_by_job_group_scan_id(cls, job_group_scan_id, by_dict=False):
+        tmp = db.session.query(cls).filter_by(job_group_scan_id=job_group_scan_id)
         if by_dict: tmp = [x.as_dict() for x in tmp]
         return tmp
 

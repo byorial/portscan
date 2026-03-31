@@ -203,7 +203,13 @@ $("body").on('click', '#modify_job_btn', function(e) {
   }
   //document.getElementById('m_schedule_mode').value = job.schedule_mode;
   document.getElementById('m_schedule_interval').value = job.schedule_interval;
-  document.getElementById('m_schedule_auto_start').value = job.schedule_auto_start;
+  if (job.schedule_auto_start) {
+    $('#m_schedule_auto_start').val('on');
+    $('#m_schedule_auto_start').bootstrapToggle('on');
+  } else {
+    $('#m_schedule_auto_start').val('off');
+    $('#m_schedule_auto_start').bootstrapToggle('off');
+  }
   $("#job_modify_modal").modal();
 });
 

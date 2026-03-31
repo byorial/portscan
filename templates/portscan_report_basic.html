@@ -21,7 +21,7 @@
 <div id="summary_card" class="card">
   <div class="card-header"><strong>기본보고서</strong></div>
   <div class="card-body">
-    스캔작업을 선택하여 해당 스캔작업에 포함된 호스트에 대한 스캔결과를 출력함
+    스캔작업그룹과 스캔작업을 선택하여 해당 스캔작업에 포함된 호스트에 대한 스캔결과를 보고서로 출력함
   </div>
 </div>
 <div>
@@ -32,13 +32,17 @@
     <div class="container-fluid">
       <div class="row show-grid">
           <span class="col-md-8">
-          <select name="jobgroup_options" id="jobgroup_options" class="form-control form-control-sm">
+          <select name="jobgroups" id="jobgroups" class="form-control form-control-sm">
+          </select>
+          <select name="jobgroup_list" id="jobgroup_list" class="form-control form-control-sm">
+          {% for item in scan_items %}
+          <option value="{{item.id}}">{{item.name}}</option>
+          {% endfor %}
           </select>
           <select name="port_options" id="port_options" class="form-control form-control-sm">
             <option value="all">전체호스트</option>
             <option value="open">열린포트</option>
           </select>
-          <!--<select name="scan_options" id="scan_options" class="selectpicker" multiple> -->
           <select name="scan_options" id="scan_options" class="form-control form-control-sm" multiple placeholder="보고서에포함할스캔작업선택">
           </select>
           </span>
@@ -66,6 +70,7 @@ var str_scan_ids = "{{arg['scan_ids']}}";
 var str_scan_names = "{{arg['scan_names']}}";
 var scan_ids = str_scan_ids.split('|');
 var scan_names = str_scan_names.split('|');
+var multipleCancelButton = null;
 
 $(document).ready(function(){
   console.log(jobgroup_ids);
@@ -78,42 +83,80 @@ $(document).ready(function(){
 
 function set_jobgroup_options(job_group_id = '') {
   for (i = 0; i < jobgroup_ids.length; i++) {
-    report_form.jobgroup_options.options[i] = new Option(jobgroup_names[i], jobgroup_ids[i]);
+    report_form.jobgroups.options[i] = new Option(jobgroup_names[i], jobgroup_ids[i]);
     if (job_group_id != '') {
-      if (job_group_id == jobgroup_ids[i]) report_form.jobgroup_options.options[i].selected = true;
+      if (job_group_id == jobgroup_ids[i]) report_form.jobgroups.options[i].selected = true;
     }
   }
-  if (jobgroup_ids.length == 1) report_form.jobgroup_options.options[0].selected = true;
-}
-
-function set_scan_options(remove=false) {
-  var jobgroup_id = document.getElementById("jobgroup_options").value;
-  console.log(jobgroup_id);
-  for (i = 0; i < scan_ids.length; i++) {
-    report_form.scan_options.options[i] = new Option(scan_names[i], scan_ids[i]);
-  }
-  if (remove) {
-      console.log(multipleCancelButton);
-  } else {
-    var multipleCancelButton = new Choices('#scan_options', {
-      removeItemButton: true,
-      maxItemCount:15,
-      searchResultLimit:15,
-      renderChoiceLimit:15,
-      shouldSort: false,
-      shouldSortItems: true
-    }); 
+  if (jobgroup_ids.length == 1) {
+    report_form.jobgroups.options[0].selected = true;
+    target_group_id = jobgroup_ids[0];
   }
 }
 
-$("body").on('change', '#jobgroup_options', function(e){
+function set_scan_options() {
+  var job_group_scan_id = document.getElementById("jobgroup_list").value;
+  if (multipleCancelButton != null) {
+    multipleCancelButton.destroy();
+  }
+  globalSendCommandPage('get_status_list', job_group_scan_id, null, null, function(ret){
+    if (ret.ret == 'success') {
+      var data = ret.data
+      console.log(data);
+      for (i in data) {
+        report_form.scan_options.options[i] = new Option(data[i].name, data[i].id);
+      }
+      multipleCancelButton = new Choices('#scan_options', {
+        removeItemButton: true,
+        maxItemCount:15,
+        searchResultLimit:15,
+        renderChoiceLimit:15,
+        shouldSort: false,
+        shouldSortItems: true
+      }); 
+    }
+    else {
+      notify(ret.data, 'warning');
+    } 
+  });
+}
+
+$("body").on('click', '#load_scan_btn', function(e){
   e.preventDefault();
-  set_scan_options(remove=true);
+  var formData = getFormdata('#report_form');
+  var job_group_scan_id = document.getElementById("jobgroup_list").value;
+  if (multipleCancelButton != null) {
+    multipleCancelButton.destroy();
+  }
+  globalSendCommandPage('get_status_list', job_group_scan_id, null, null, function(ret){
+    if (ret.ret == 'success') {
+      var data = ret.data
+      console.log(data);
+      for (i in data) {
+        report_form.scan_options.options[i] = new Option(data[i].name, data[i].id);
+      }
+      multipleCancelButton = new Choices('#scan_options', {
+        removeItemButton: true,
+        maxItemCount:15,
+        searchResultLimit:15,
+        renderChoiceLimit:15,
+        shouldSort: false,
+        shouldSortItems: true
+      }); 
+    }
+    else {
+      notify(ret.data, 'warning');
+    } 
+  });
 });
 
-$("body").on('change', '#scan_type', function(e){
+$("body").on('change', '#jobgroups', function(e){
   e.preventDefault();
-  request_search(1);
+});
+
+$("body").on('change', '#jobgroup_list', function(e){
+  e.preventDefault();
+  set_scan_options();
 });
 
 $("body").on('change', '#order_by', function(e){
@@ -174,6 +217,11 @@ function j_button_tt(id, text, data, outline_color, tooltip='', pos='down', size
 $("body").on('click', '#basic_report_btn', function(e){
   e.preventDefault();
   var formData = getFormdata('#report_form');
+  const Params = new URLSearchParams(formData);
+  if (Params.get('scan_options') == null) {
+    alert('보고서에 포함할 스캔 작업을 선택해 주세요');
+    return;
+  }
   globalSendCommandPage('basic_report', formData, null, null, function(ret){
     if (ret.ret == 'success') {
       window.location.href = "/portscan_report_download?path="+ret.data.path+"&name="+ret.data.name;

@@ -53,6 +53,7 @@ class PageBasicReport(PluginPageBase):
         groups = ModelScanJobGroupItem.get_all_items()
         arg['jobgroup_ids'] = '|'.join(list(str(x.id) for x in groups))
         arg['jobgroup_names'] = '|'.join(list(str(x.name) for x in groups))
+        scan_items = ModelGroupScanItem.get_list_by_job_group_id(by_dict=True)
         jobs = ModelScanJobItem.get_all_items()
         scans = ModelScanItem.get_all_items()
         logger.info(f'------SCANS----------')
@@ -71,7 +72,11 @@ class PageBasicReport(PluginPageBase):
         logger.info(f'------SCANS-IDS------')
         logger.info(f'{arg["scan_ids"]}')
         if 'scan_id' in req.args: arg['start_scan_id'] = req.args.get('scan_id')
-        return render_template(f'{self.P.package_name}_{self.parent.name}_{self.name}.html', arg=arg)
+
+        for s in scan_items:
+            grp = ModelScanJobGroupItem.get_by_id(int(s['job_group_id']))
+            s['name'] = grp.name + '-' + s['execute_time']
+        return render_template(f'{self.P.package_name}_{self.parent.name}_{self.name}.html', arg=arg, scan_items=scan_items, json_data=json.dumps(scan_items))
 
     def process_command(self, command, arg1, arg2, arg3, req):
         ret = {'ret':'success'}
@@ -84,6 +89,12 @@ class PageBasicReport(PluginPageBase):
                 s['name'] = j.name
                 s['desc'] = j.desc
             ret['list'] = scans
+        elif command == 'get_status_list':
+            scans = ModelScanItem.get_list_by_job_group_scan_id(int(arg1), by_dict=True)
+            for s in scans:
+                j = ModelScanJobItem.get_by_id(int(s['scan_job_id']))
+                s['name'] = j.name + s['created_time']
+            ret['data'] = scans
         elif command == 'basic_report':
             ret = self.gen_basic_report(self.my_arg_to_dict(arg1))
         return jsonify(ret)
@@ -96,7 +107,8 @@ class PageBasicReport(PluginPageBase):
             fname = os.path.join(ModelSetting.get('report_file_path'), f'포트스캔_기본리포트_{str_today}.xlsx')
             logger.info(f'[base_report] fname: {fname}')
 
-            columns = list(x.upper() for x in ModelScanResultItem.__table__.columns.keys())
+            #columns = list(x.upper() for x in ModelScanResultItem.__table__.columns.keys())
+            columns = ['ID', '생성시각', '스캔시작시각', '스캔종료시각', '스캔작업구분', '작업그룹', '실행ID', '대상HOST', '열린포트', '상세결과']
             items = ModelScanResultItem.get_list_for_report(req)
 
             contents = []
@@ -105,7 +117,20 @@ class PageBasicReport(PluginPageBase):
             for _ in items:
                 if req['port_options'] == 'open':
                     if _.open_ports == '': continue
-                contents.append([_.id,_.created_time.strftime('%Y-%m-%d %H:%M:%S'), _.scan_job_id, _.job_group_id, _.scan_execute_id, _.start_time.strftime('%Y-%m-%d %H:%M:%S'), _.host, _.open_ports.replace('|',', '), _.result, _.end_time.strftime('%Y-%m-%d %H:%M:%S')])
+
+                idx   = _.id
+                ctime = _.created_time.strftime('%Y-%m-%d %H:%M:%S')
+                stime = _.start_time.strftime('%Y-%m-%d %H:%M:%S')
+                etime = _.end_time.strftime('%Y-%m-%d %H:%M:%S')
+                job   = ModelScanJobItem.get_by_id(_.scan_job_id).name
+                jobgrp= ModelScanJobGroupItem.get_by_id(_.job_group_id).name
+                execid= _.scan_execute_id
+                thost = _.host
+                ports = _.open_ports.replace('|',', ')
+                result= _.result
+
+                contents.append([idx, ctime, stime, etime, job, jobgrp, execid, thost, ports, result])
+                #contents.append([_.id,_.created_time.strftime('%Y-%m-%d %H:%M:%S'), _.scan_job_id, _.job_group_id, _.scan_execute_id, _.start_time.strftime('%Y-%m-%d %H:%M:%S'), _.host, _.open_ports.replace('|',', '), _.result, _.end_time.strftime('%Y-%m-%d %H:%M:%S')])
 
             book = xlsxwriter.Workbook(fname)
             ws1 = book.add_worksheet(f'base_report_{str_today}')

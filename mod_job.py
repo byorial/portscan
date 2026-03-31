@@ -62,6 +62,16 @@ class ModuleJob(PluginModuleBase):
     def plugin_load(self):
         def func():
             try:
+                # for jobgroup
+                db_items = ModelScanJobGroupItem.get_scheduled_items()
+                for db_item in db_items:
+                    if db_item['schedule_mode'] == 'startup':
+                        th = threading.Thread(target=ScanUtils.execute_jobgroup, args=(db_item['id'], None))
+                        th.setDaemon(True)
+                        th.start()
+                    elif db_item['schedule_mode'] == 'scheduler' and db_item['schedule_auto_start']:
+                        ScanUtils.schedule_add_group(db_item['id'])
+                # for job
                 db_items = ModelScanJobItem.get_scheduled_items()
                 for db_item in db_items:
                     if db_item['schedule_mode'] == 'startup':

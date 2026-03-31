@@ -121,7 +121,7 @@ class ScanUtils:
         db_item = ModelScanJobGroupItem(info['name'], info['desc'])
         db_item.schedule_mode = info['schedule_mode']
         db_item.schedule_auto_start = True if info['schedule_auto_start'] == 'True' else False
-        db_item.schedule_intarval = info['schedule_intarval']
+        db_item.schedule_interval = info['schedule_interval']
         db_item.save()
         try:
             if info['schedule_mode'] == 'scheduler':
@@ -207,6 +207,14 @@ class ScanUtils:
         db_item.save()
         return {'ret':'success', 'data':{'id':db_item.id}}
 
+    def schedule_add_group(db_id, db_item = None):
+        if not db_item: db_item = ModelScanJobGroupItem.get_by_id(int(db_id))
+        sch_id = f'portscan_jobgroup_{db_item.id}'
+        if scheduler.is_include(sch_id): F.scheduler.remove_job(sch_id)
+        job = Job(P.package_name, sch_id, db_item.schedule_interval, ScanUtils.execute_jobgroup, db_item.desc, args=(db_item.id,))
+        scheduler.add_job_instance(job)
+        logger.debug(f'[schedule_add_group] 스캐쥴링 작업추가({sch_id})')
+
     def schedule_add(db_id, db_item = None):
         if not db_item: db_item = ModelScanJobItem.get_by_id(int(db_id))
         sch_id = f'portscan_job_{db_item.id}'
@@ -224,32 +232,45 @@ class ScanUtils:
     def execute_jobgroup(jobgroup_id):
         try:
             logger.debug(f'[execute-grp] START {jobgroup_id}')
+            scan_group_item = ModelGroupScanItem(int(jobgroup_id))
+            scan_group_item.job_group_id = jobgroup_id
+            scan_group_item.execute_time = datetime.now()
+            scan_group_item.save()
+
             jobgroup = ModelScanJobGroupItem.get_by_id(int(jobgroup_id))
             logger.debug(f'[execute-grp] {jobgroup.id},{jobgroup.name}')
             jobs = ModelScanJobItem.get_job_list_by_jobgroup(jobgroup_id=jobgroup.id)
+            job_ids = []
+
+            jobgroup.execute_time = datetime.now()
             for job in jobs:
+                job_ids.append(job.id)
                 call_id = f'portscan_job_{job.id}'
                 process = SupportSubprocess.get_instance_by_call_id(call_id)
                 if process != None:
                     logger.info(f'[execute-grp] SKIP! 이미 실행중인 작업: {call_id}')
                     continue
 
+                #TODO
                 """
                 job = Job(P.package_name, db_item.schedule_interval, ScanUtils.execute_job, db_item.desc, arg=(db_item.id, True))
                 scheduler.add_job_instance(job)
                 """
                 logger.debug(f'[execute-grp] 쓰레드로 작업 실행 {job.name},{job.desc},{job.target_hosts}')
-                th = threading.Thread(target=ScanUtils.execute_job, args=(str(job.id)))
+                th = threading.Thread(target=ScanUtils.execute_job, args=(job.id, scan_group_item.id,))
                 th.setDaemon(True)
                 th.start()
+
+            scan_group_item.scan_job_ids = json.dumps(job_ids)
+            scan_group_item.save()
             logger.debug(f'[execute-grp] END {jobgroup_id}')
         except Exception as e:
             logger.error(f'Exception: {str(e)}')
             logger.error(traceback.format_exc())
 
-    def execute_job(job_id):
+    def execute_job(job_id, job_group_scan_id=None):
         try:
-            logger.debug(f'[execute] {job_id}')
+            logger.debug(f'[execute] {job_id},{job_group_scan_id}')
             job = ModelScanJobItem.get_by_id(job_id)
             logger.info(f'[execute] 스케쥴 작업 시작({job.name}/{job.id}/{job.desc}')
 
@@ -259,6 +280,8 @@ class ScanUtils:
 
             scan_item = ModelScanItem(job.id)
             now = datetime.now()
+            if job_group_scan_id: scan_item.job_group_scan_id = int(job_group_scan_id)
+            else: scan_item.job_group_scan_id = -1
             scan_item.start_time = now
             scan_item.num_hosts = len(hosts)
             scan_item.curr_host = 0
@@ -270,13 +293,16 @@ class ScanUtils:
             scan_item.save()
             for i in range(0, scan_item.num_hosts):
                 host = hosts[i]
-                logger.debug(f'[execute] ({job_id:2}) 스캔시도({i+1:{sp}}/{scan_item.num_hosts}): host({host}), ports({ports})')
+                logger.debug(f'[execute] ({job_id:2}) 스캔시도({i+1:{sp}}/{scan_item.num_hosts}): host({host})')
                 scan_item.curr_host = i
                 result_item = ModelScanResultItem(job.job_group_id, job_id, scan_item.id, host)
                 result_item.start_time = datetime.now()
                 result_item.save()
                 res = s.scan(host, 'scan_test')
-                logger.debug(f'[execute] ({job_id:2}) 스캔결과({i+1:{sp}}/{scan_item.num_hosts}): host({host}), result({res})')
+                res_open = {}
+                for p, o in res.items():
+                    if o == 'OPEN': res_open[p] = o
+                logger.debug(f'[execute] ({job_id:2}) 스캔결과({i+1:{sp}}/{scan_item.num_hosts}): host({host}), result({res_open})')
                 scan_item.save()
                 result_item.result = json.dumps(res)
                 result_item.open_ports = ScanUtils.get_open_ports(res)
